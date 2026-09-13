@@ -1462,9 +1462,9 @@ body {
   display: none;
 }
 
-/* Floating center HUD bar */
+/* Floating center HUD bar — kept narrow so it never slides under the side panels */
 .arena-hud {
-  width: min(880px, 96vw);
+  width: min(640px, 94vw);
   margin: 0.25rem auto 0;
   border: 1px solid rgba(240, 246, 252, 0.1);
   border-radius: 14px;
@@ -1485,7 +1485,7 @@ body {
 }
 
 .side-panel {
-  width: 320px;
+  width: 300px;
   max-height: calc(100svh - 15rem);
   overflow-y: auto;
   pointer-events: auto;
@@ -1536,6 +1536,18 @@ body.mash-mode .side-panel {
   position: fixed;
   inset: 0;
   z-index: 4;
+}
+
+@media (max-width: 1350px) {
+  .arena-hud {
+    width: min(560px, 92vw);
+  }
+  .side-panel {
+    width: 272px;
+  }
+  .hud-player {
+    min-width: unset;
+  }
 }
 
 @media (max-width: 1100px) {
