@@ -1,5 +1,7 @@
 # GitTug — 1v1 GitHub Tug of War Arena
 
+**Live Demo: https://gittug.vercel.app**
+
 1v1 GitHub developer tug-of-war powered by **real GitHub data** in an immersive **3D arena**.
 
 Pick any two GitHub usernames. GitTug fetches their real stats (commits, PRs, issues, followers, repos), converts contribution history into 3D voxel cities, and simulates a cinematic tug-of-war battle with physics rope, live commentary, and sound.
@@ -118,6 +120,8 @@ src/
 | `npm run preview` | Preview `dist/` locally |
 
 ## Deployment
+
+Live on Vercel: **https://gittug.vercel.app**
 
 Any static host works (Vercel, Netlify, GitHub Pages, Cloudflare Pages):
 
