@@ -6,6 +6,9 @@ import { sounds } from '../engine/audio'
 export default function Header({ onSelectPreset, onToggleGuide, guideOpen }) {
   const mode = useBattleStore((s) => s.mode)
   const setMode = useBattleStore((s) => s.setMode)
+  const graphics = useBattleStore((s) => s.graphics)
+  const setGraphics = useBattleStore((s) => s.setGraphics)
+  const setView = useBattleStore((s) => s.setView)
   const muted = useBattleStore((s) => s.muted)
   const toggleMute = useBattleStore((s) => s.toggleMute)
 
@@ -29,7 +32,7 @@ export default function Header({ onSelectPreset, onToggleGuide, guideOpen }) {
     <header className="arena-header">
       <div className="header-left">
         <div className="brand-container">
-          <h1 className="brand-title">
+          <h1 className="brand-title" onClick={() => setView('landing')} style={{ cursor: 'pointer' }} title="Back to home">
             GIT<span className="brand-accent">TUG</span>
           </h1>
           <span className="status-indicator">
@@ -57,6 +60,23 @@ export default function Header({ onSelectPreset, onToggleGuide, guideOpen }) {
       </div>
 
       <div className="header-controls">
+        <button className="btn-tactile-tool" onClick={() => setView('landing')} title="Back to landing page">
+          ← Home
+        </button>
+        <div className="mode-toggle-group" title="Graphics quality — LOW disables reflections, HDR, particles and shadows for slow devices">
+          <button
+            className={`mode-toggle-btn ${graphics === 'high' ? 'active' : ''}`}
+            onClick={() => setGraphics('high')}
+          >
+            HIGH
+          </button>
+          <button
+            className={`mode-toggle-btn ${graphics === 'low' ? 'active' : ''}`}
+            onClick={() => setGraphics('low')}
+          >
+            LOW
+          </button>
+        </div>
         <div className="mode-toggle-group">
           <button
             className={`mode-toggle-btn ${mode === 'auto' ? 'active' : ''}`}

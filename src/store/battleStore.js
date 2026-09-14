@@ -22,6 +22,30 @@ export const useBattleStore = create((set, get) => ({
   mode: 'auto', // 'auto' | 'mash'
   setMode: (mode) => set({ mode }),
 
+  // Navigation: 'landing' | 'arena' — landing is the marketing entry,
+  // arena is the 3D battle page. Deep-link with #arena.
+  view: typeof location !== 'undefined' && location.hash === '#arena' ? 'arena' : 'landing',
+  setView: (view) => {
+    try {
+      if (view === 'arena') history.replaceState(null, '', '#arena')
+      else history.replaceState(null, '', location.pathname)
+    } catch {}
+    set({ view })
+  },
+
+  // Graphics quality: 'high' | 'low' — low disables reflector, HDR,
+  // stars/sparkles, shadows and throttles rope/voxel updates
+  graphics: typeof localStorage !== 'undefined' ? (localStorage.getItem('gittug_graphics') || 'high') : 'high',
+  setGraphics: (graphics) => {
+    try { localStorage.setItem('gittug_graphics', graphics) } catch {}
+    set({ graphics })
+  },
+  toggleGraphics: () => {
+    const next = get().graphics === 'high' ? 'low' : 'high'
+    try { localStorage.setItem('gittug_graphics', next) } catch {}
+    set({ graphics: next })
+  },
+
   // Physics (updated at 60fps by engine)
   ropeOffset: 0,       // -100 to +100
   tension: 0.3,        // 0 to 1

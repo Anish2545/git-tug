@@ -7,6 +7,8 @@ import { Commentator } from './engine/commentator'
 import { useBattleStore } from './store/battleStore'
 import Arena from './scene/Arena'
 import Layout from './ui/Layout'
+import Landing from './ui/Landing'
+import ErrorBoundary from './ui/ErrorBoundary'
 import Header from './ui/Header'
 import HUD from './ui/HUD'
 import FighterCard from './ui/FighterCard'
@@ -18,7 +20,12 @@ import MetricsGuide from './ui/MetricsGuide'
 
 export default function App() {
   const engineRef = useRef(null)
+  const bootedRef = useRef(false)
   const [showGuide, setShowGuide] = useState(false)
+  const graphics = useBattleStore((s) => s.graphics)
+  const view = useBattleStore((s) => s.view)
+  const isLow = graphics === 'low'
+  const isLanding = view === 'landing'
 
   // Instantiate engine once, bridge callbacks into zustand store
   useEffect(() => {
@@ -63,8 +70,12 @@ export default function App() {
     engine.setMode(useBattleStore.getState().mode)
     sounds.muted = useBattleStore.getState().muted
 
-    // bootstrap default preset
-    loadFighters('torvalds', 'yyx990803', engine)
+    // Don't fetch GitHub on the landing page — wait until arena entry
+    // so first paint is instant and costs zero API calls.
+    if (useBattleStore.getState().view === 'arena') {
+      bootedRef.current = true
+      loadFighters('torvalds', 'yyx990803', engine)
+    }
 
     // keyboard mash: A = P1, L = P2
     const onKey = (e) => {
@@ -96,11 +107,17 @@ export default function App() {
     }
   }, [mode])
 
+  // toggle landing-mode class so arena-only floating UI stays hidden
+  useEffect(() => {
+    document.body.classList.toggle('landing-mode', view === 'landing')
+    return () => document.body.classList.remove('landing-mode')
+  }, [view])
+
   // hide side panels during manual tug so the fullscreen arena is playable
   useEffect(() => {
-    document.body.classList.toggle('mash-mode', mode === 'mash')
+    document.body.classList.toggle('mash-mode', mode === 'mash' && view === 'arena')
     return () => document.body.classList.remove('mash-mode')
-  }, [mode])
+  }, [mode, view])
 
   // keep audio mute in sync with store
   const muted = useBattleStore((s) => s.muted)
@@ -190,20 +207,48 @@ export default function App() {
     engineRef.current?.reset()
   }
 
+  const ensureBooted = () => {
+    if (!bootedRef.current) {
+      bootedRef.current = true
+      loadFighters('torvalds', 'yyx990803')
+    }
+  }
+
+  const handleEnterArena = () => {
+    ensureBooted()
+    useBattleStore.getState().setView('arena')
+  }
+
+  const handleBattlePreset = (a, b) => {
+    bootedRef.current = true
+    useBattleStore.getState().setView('arena')
+    loadFighters(a, b)
+  }
+
+  if (isLanding) {
+    return (
+      <Layout>
+        <Landing onEnterArena={handleEnterArena} onBattlePreset={handleBattlePreset} />
+      </Layout>
+    )
+  }
+
   return (
     <Layout>
       {/* Fullscreen 3D world — transparent bg so the reactive CSS sky shows through */}
       <div className="canvas-fixed">
-        <Canvas
-          shadows="soft"
-          dpr={[1, 2]}
-          camera={{ position: [8.5, 7.5, 11], fov: 42 }}
-          gl={{ antialias: true, alpha: true }}
-        >
-          <Suspense fallback={null}>
-            <Arena />
-          </Suspense>
-        </Canvas>
+        <ErrorBoundary>
+          <Canvas
+            shadows={isLow ? false : 'soft'}
+            dpr={isLow ? [1, 1] : [1, 2]}
+            camera={{ position: [8.5, 7.5, 11], fov: 42 }}
+            gl={{ antialias: !isLow, alpha: true, powerPreference: isLow ? 'low-power' : 'high-performance' }}
+          >
+            <Suspense fallback={null}>
+              <Arena />
+            </Suspense>
+          </Canvas>
+        </ErrorBoundary>
       </div>
 
       <Header

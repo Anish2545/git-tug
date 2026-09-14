@@ -4,8 +4,8 @@ import { Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import { useBattleStore } from '../store/battleStore'
 
-const DUST_COUNT = 220
-const CONFETTI_COUNT = 350
+const DUST_COUNT = 140
+const CONFETTI_COUNT = 220
 
 const CONFETTI_COLORS = ['#f0c060', '#58a6ff', '#f85149', '#39d353', '#f0f6fc']
 
@@ -47,6 +47,7 @@ function useConfettiParticles() {
 export default function ParticleSystem() {
   const dustRef = useRef()
   const confettiRef = useRef()
+  const isLow = useBattleStore((s) => s.graphics === 'low')
   const dust = useDustParticles()
   const confetti = useConfettiParticles()
 
@@ -65,14 +66,14 @@ export default function ParticleSystem() {
 
   useFrame(({ clock }, delta) => {
     const st = useBattleStore.getState()
-    const { tension, velocity, winner } = st
+    const { tension, velocity, winner, graphics } = st
     const t = clock.getElapsedTime()
+    const low = graphics === 'low'
 
-    // Pull dust: drifts upward, streams sideways with the rope's rush,
-    // intensity follows tension + velocity
-    if (dustRef.current) {
+    // Pull dust: skipped entirely in LOW mode
+    if (dustRef.current && !low) {
       const pos = dustRef.current.geometry.attributes.position
-      const activity = 0.25 + tension * 1.6 + Math.min(1.5, Math.abs(velocity) * 0.25)
+      const activity = 0.2 + tension * 1.0 + Math.min(1, Math.abs(velocity) * 0.18)
       // Dust gets dragged along with the pull direction, stronger on heaves
       const streamX = velocity * 0.35
       for (let i = 0; i < DUST_COUNT; i++) {
@@ -88,11 +89,10 @@ export default function ParticleSystem() {
           pos.setZ(i, (Math.random() - 0.5) * 3.5)
         }
         pos.setY(i, y)
-        // slight sideways shimmer on top of the stream
-        pos.setX(i, x + Math.sin(t * 3 + i) * 0.0015 * activity)
+        pos.setX(i, x)
       }
       pos.needsUpdate = true
-      dustRef.current.material.opacity = 0.15 + tension * 0.55
+      dustRef.current.material.opacity = 0.1 + tension * 0.35
       dustRef.current.visible = true
     }
 
@@ -117,35 +117,41 @@ export default function ParticleSystem() {
 
   return (
     <group>
-      {/* GPU ambience: blue embers left, red embers right (static props, zero re-renders) */}
-      <Sparkles
-        count={70}
-        scale={[7, 3.5, 5]}
-        position={[-5.2, 1.6, 0]}
-        size={3}
-        speed={0.35}
-        opacity={0.55}
-        color="#58a6ff"
-      />
-      <Sparkles
-        count={70}
-        scale={[7, 3.5, 5]}
-        position={[5.2, 1.6, 0]}
-        size={3}
-        speed={0.35}
-        opacity={0.55}
-        color="#f85149"
-      />
-      <points ref={dustRef} geometry={dustGeometry}>
-        <pointsMaterial
-          color="#8b949e"
-          size={0.055}
-          transparent
+      {/* GPU ambience — disabled in LOW mode */}
+      {!isLow && (
+        <Sparkles
+          count={40}
+          scale={[7, 3.5, 5]}
+          position={[-5.2, 1.6, 0]}
+          size={2.5}
+          speed={0.25}
           opacity={0.35}
-          depthWrite={false}
-          sizeAttenuation
+          color="#58a6ff"
         />
-      </points>
+      )}
+      {!isLow && (
+        <Sparkles
+          count={40}
+          scale={[7, 3.5, 5]}
+          position={[5.2, 1.6, 0]}
+          size={2.5}
+          speed={0.25}
+          opacity={0.35}
+          color="#f85149"
+        />
+      )}
+      {!isLow && (
+        <points ref={dustRef} geometry={dustGeometry}>
+          <pointsMaterial
+            color="#8b949e"
+            size={0.045}
+            transparent
+            opacity={0.3}
+            depthWrite={false}
+            sizeAttenuation
+          />
+        </points>
+      )}
       <points ref={confettiRef} geometry={confettiGeometry} visible={false}>
         <pointsMaterial
           size={0.12}

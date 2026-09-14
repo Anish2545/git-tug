@@ -7,12 +7,14 @@ import { useBattleStore } from '../store/battleStore'
 const ROPE_SEGMENTS = 20
 
 export default function TugCable({ p1X = -5.2, p2X = 5.2, handsY = 1.2 }) {
+  const isLow = useBattleStore((s) => s.graphics === 'low')
   const tubeRef = useRef()
   const matRef = useRef()
   const gripL = useRef()
   const gripR = useRef()
   const midRef = useRef()
   const tmp = useMemo(() => new THREE.Vector3(), [])
+  const frame = useRef(0)
   // Traveling heave wave: fired from the pulling side on yank kicks,
   // sweeps down the rope and decays. pos in 0..1, -1 = idle.
   const heave = useRef({ pos: -1, dir: 1, amp: 0 })
@@ -43,7 +45,8 @@ export default function TugCable({ p1X = -5.2, p2X = 5.2, handsY = 1.2 }) {
   useFrame(({ clock }, delta) => {
     const mesh = tubeRef.current
     if (!mesh) return
-    const { ropeOffset, tension, velocity } = useBattleStore.getState()
+    const { ropeOffset, tension, velocity, graphics } = useBattleStore.getState()
+    const isLow = graphics === 'low'
 
     const t = clock.getElapsedTime()
     const maxShift = 3.8
@@ -69,43 +72,49 @@ export default function TugCable({ p1X = -5.2, p2X = 5.2, handsY = 1.2 }) {
       }
     }
 
-    // Quadratic bezier: left end → sagging mid → right end
-    const maxSag = (1 - tension) * 1.4
-    const jitter =
-      tension > 0.6 ? Math.sin(t * 8) * tension * 0.12 : Math.sin(t * 2) * 0.03
-    const midSagY = handsY - maxSag + jitter
+    // Quadratic bezier: left end → sagging mid → right end.
+    // Sag and sway are slow and uniform — no per-segment high-frequency
+    // wobble (that reads as jitter, not physics).
+    const maxSag = (1 - tension) * 1.1
+    const sway = Math.sin(t * 1.5) * 0.015
+    const midSagY = handsY - maxSag + sway
 
     for (let i = 0; i <= ROPE_SEGMENTS; i++) {
       const tt = i / ROPE_SEGMENTS
       const a = (1 - tt) * (1 - tt)
       const b = 2 * (1 - tt) * tt
       const c = tt * tt
-      // Traveling heave bump: gaussian pulse around the wavefront
+      // Traveling heave bump: smooth gaussian pulse around the wavefront
       let waveY = 0
       let waveZ = 0
       if (hv.pos >= 0) {
-        const d = (tt - hv.pos) / 0.16
+        const d = (tt - hv.pos) / 0.2
         const bump = hv.amp * Math.exp(-d * d)
-        waveY = bump
-        waveZ = bump * 0.6 * Math.sin(t * 20 + i)
+        waveY = bump * 0.8
+        waveZ = bump * 0.3 * Math.sin(t * 6 + tt * 4)
       }
       points[i].set(
         a * (p1X + 0.4) + b * ribbonX + c * (p2X - 0.4),
         a * handsY + b * midSagY + c * handsY + waveY,
-        Math.sin(t * 3 + i * 0.7) * 0.02 * tension + waveZ
+        waveZ
       )
     }
     curve.updateArcLengths()
 
-    // Rope swells under load: thicker + heave bulge at the wavefront
-    const radius = 0.05 + tension * 0.022 + hv.amp * 0.06
-    const next = new THREE.TubeGeometry(curve, 32, radius, 8, false)
-    mesh.geometry.dispose()
-    mesh.geometry = next
+    // Rebuild tube throttled: ~20fps high, ~10fps low to cut GC churn.
+    // Radius stays constant — thickness pulsing with tension looked like shimmer.
+    frame.current += 1
+    const stride = isLow ? 6 : 3
+    if (frame.current % stride === 0) {
+      const radius = 0.055 + hv.amp * 0.02
+      const next = new THREE.TubeGeometry(curve, isLow ? 12 : 20, radius, isLow ? 5 : 6, false)
+      mesh.geometry.dispose()
+      mesh.geometry = next
+    }
 
-    // Tension glow via emissive — no second tube needed
+    // Tension glow via emissive — kept subtle
     if (matRef.current) {
-      matRef.current.emissiveIntensity = tension > 0.6 ? (tension - 0.6) * 3 : 0.12
+      matRef.current.emissiveIntensity = tension > 0.6 ? (tension - 0.6) * 1.5 : 0.08
     }
     // Grip handles ride the cable; trail anchor follows the whip point
     if (gripL.current) {
@@ -154,18 +163,20 @@ export default function TugCable({ p1X = -5.2, p2X = 5.2, handsY = 1.2 }) {
           roughness={0.4}
         />
       </mesh>
-      {/* Gold motion ribbon trailing the rope's whip point */}
-      <Trail
-        width={0.55}
-        length={2.2}
-        color={new THREE.Color('#f0c060')}
-        attenuation={(w) => w * w}
-      >
-        <mesh ref={midRef} visible={false}>
-          <sphereGeometry args={[0.05, 8, 8]} />
-          <meshBasicMaterial color="#f0c060" />
-        </mesh>
-      </Trail>
+      {/* Gold motion ribbon trailing the rope's whip point — off in LOW */}
+      {!isLow && (
+        <Trail
+          width={0.55}
+          length={2.2}
+          color={new THREE.Color('#f0c060')}
+          attenuation={(w) => w * w}
+        >
+          <mesh ref={midRef} visible={false}>
+            <sphereGeometry args={[0.05, 8, 8]} />
+            <meshBasicMaterial color="#f0c060" />
+          </mesh>
+        </Trail>
+      )}
     </group>
   )
 }

@@ -75,10 +75,10 @@ export default function FighterCard({ side, onSearch }) {
       </form>
 
       <div className="metrics-grid">
-        <div className="metric-tile tile-primary" title="Primary Cable Pull Force">
+        <div className="metric-tile tile-primary" title="Primary Cable Pull Force — Round 1, 35% weight">
           <div className="metric-numbers">
             <span className="metric-number-val">{stats.commits.toLocaleString()}</span>
-            <span className="metric-number-label">Commits (60%)</span>
+            <span className="metric-number-label">Commits · 35%</span>
           </div>
         </div>
         <div className="metric-tile" title="Repository Structural Weight">

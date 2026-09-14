@@ -85,6 +85,7 @@ function Developer({ side, handsY = 1.2 }) {
   // Avatar/nameplate data only — re-renders on fighter change, NOT on physics ticks
   const fighter = useBattleStore((s) => (side === 'left' ? s.p1 : s.p2))
   const baseX = side === 'left' ? -5.2 : 5.2
+  const lastTargets = React.useRef({ rotZ: 0, posX: baseX, bounceY: 0, digY: 0.04, squashY: 1 })
 
   const [{ rotZ, posX, bounceY, digY, squashY }, api] = useSpring(() => ({
     rotZ: 0,
@@ -92,7 +93,7 @@ function Developer({ side, handsY = 1.2 }) {
     bounceY: 0,
     digY: 0.04,
     squashY: 1,
-    config: { mass: 1.2, tension: 170, friction: 20 },
+    config: { mass: 1.4, tension: 120, friction: 32 },
   }))
 
   // Imperative spring targets from live physics — no 60fps React re-renders.
@@ -114,24 +115,36 @@ function Developer({ side, handsY = 1.2 }) {
 
     let targetLean = 0
     if (isLoser) {
-      targetLean = side === 'left' ? 0.55 : -0.55
+      targetLean = side === 'left' ? 0.38 : -0.38
     } else if (!isWinner) {
-      if (ropeOffset < -5 && side === 'left') targetLean = -(0.35 + strain * 0.2)
-      else if (ropeOffset > 5 && side === 'right') targetLean = 0.35 + strain * 0.2
-      else if (ropeOffset < -5 && side === 'right') targetLean = 0.12 + strain * 0.1
-      else if (ropeOffset > 5 && side === 'left') targetLean = -(0.12 + strain * 0.1)
+      if (ropeOffset < -5 && side === 'left') targetLean = -(0.24 + strain * 0.14)
+      else if (ropeOffset > 5 && side === 'right') targetLean = 0.24 + strain * 0.14
+      else if (ropeOffset < -5 && side === 'right') targetLean = 0.08 + strain * 0.07
+      else if (ropeOffset > 5 && side === 'left') targetLean = -(0.08 + strain * 0.07)
       // Yank kick: extra snap away from center while actively dragging
-      if (dragging) targetLean += (side === 'left' ? -1 : 1) * effort * 0.22
+      if (dragging) targetLean += (side === 'left' ? -1 : 1) * effort * 0.14
     }
 
     const maxShift = 3.8
-    api.start({
+    const next = {
       rotZ: targetLean,
       posX: baseX + (ropeOffset / 100) * maxShift * 0.55,
       bounceY: isWinner ? 1 : 0,
-      digY: 0.04 - effort * 0.13,
-      squashY: 1 - effort * 0.1,
-    })
+      digY: 0.04 - effort * 0.08,
+      squashY: 1 - effort * 0.06,
+    }
+    // Only restart the spring when targets moved — avoids 60fps spring spam
+    const prev = lastTargets.current
+    if (
+      Math.abs(next.rotZ - prev.rotZ) > 0.01 ||
+      Math.abs(next.posX - prev.posX) > 0.01 ||
+      Math.abs(next.bounceY - prev.bounceY) > 0.01 ||
+      Math.abs(next.digY - prev.digY) > 0.006 ||
+      Math.abs(next.squashY - prev.squashY) > 0.006
+    ) {
+      lastTargets.current = next
+      api.start(next)
+    }
   })
 
   const accentColor = side === 'left' ? '#58a6ff' : '#f85149'
@@ -158,7 +171,7 @@ function Developer({ side, handsY = 1.2 }) {
       {/* Accent stripe on torso */}
       <mesh position={[0, 0.92, 0.18]}>
         <boxGeometry args={[0.06, 0.42, 0.025]} />
-        <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.5} />
+        <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.35} />
       </mesh>
 
       {/* Arm reaching toward rope */}
@@ -192,7 +205,7 @@ function Developer({ side, handsY = 1.2 }) {
           <meshStandardMaterial
             color={accentColor}
             emissive={accentColor}
-            emissiveIntensity={0.6}
+            emissiveIntensity={0.4}
           />
         </mesh>
         <VictoryStar side={side} />
@@ -215,14 +228,19 @@ function Developer({ side, handsY = 1.2 }) {
 function VictoryStar({ side }) {
   const winner = useBattleStore((s) => s.winner)
   const me = useBattleStore((s) => (side === 'left' ? s.p1 : s.p2))
+  const isLow = useBattleStore((s) => s.graphics === 'low')
   const isWinner = !!(winner && me && winner.login === me.login)
   if (!isWinner) return null
+  const star = (
+    <mesh position={[0, 2.05, 0]}>
+      <octahedronGeometry args={[0.18]} />
+      <meshStandardMaterial color="#f0c060" emissive="#f0c060" emissiveIntensity={0.8} />
+    </mesh>
+  )
+  if (isLow) return star
   return (
-    <Float speed={6} rotationIntensity={2} floatIntensity={3}>
-      <mesh position={[0, 2.05, 0]}>
-        <octahedronGeometry args={[0.18]} />
-        <meshStandardMaterial color="#f0c060" emissive="#f0c060" emissiveIntensity={1.2} />
-      </mesh>
+    <Float speed={4} rotationIntensity={1} floatIntensity={2}>
+      {star}
     </Float>
   )
 }
@@ -237,7 +255,7 @@ function FootRing({ accentColor, side }) {
     }
   })
   return (
-    <mesh ref={ringRef} position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh ref={ringRef} position={[0, 0.038, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[0.38, 0.52, 32]} />
       <meshBasicMaterial color={accentColor} transparent opacity={0.25} depthWrite={false} />
     </mesh>
